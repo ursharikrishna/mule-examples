@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:cluster="http://www.mulesoft.org/schema/mule/ee/cluster" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">	
+    <file:connector name="File" autoDelete="true" outputAppend="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <ws:consumer-config name="Web_Service_Consumer" wsdlLocation="http://www.webservicex.com/globalweather.asmx?WSDL" service="GlobalWeather" port="GlobalWeatherSoap" serviceAddress="http://www.webservicex.com/globalweather.asmx" doc:name="Web Service Consumer"/>
+    <db:generic-config name="Generic_Database_Configuration" url="jdbc:postgresql://localhost:5432?user=postgres&amp;password=postgres" driverClassName="org.postgresql.Driver" doc:name="Generic Database Configuration"/>
+    <flow name="FileConnector">
+        <file:inbound-endpoint path="D:\Hari\Great Place\Mule383WS_19thMar2017\fileConnectorTestData\Input" moveToDirectory="D:\Hari\Great Place\Mule383WS_19thMar2017\fileConnectorTestData\Backup" connector-ref="File"  responseTimeout="10000" doc:name="File"/>
+        <logger level="INFO" doc:name="Logger"/>
+        <file:outbound-endpoint path="D:\Hari\Great Place\Mule383WS_19thMar2017\fileConnectorTestData\Output" connector-ref="File" responseTimeout="10000" doc:name="File"/>
+    </flow>
+    <flow name="/connectors/webserviceconsumer">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/connectors/webserviceconsumer" doc:name="HTTP"/>                     
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <ws:consumer config-ref="Web_Service_Consumer" operation="GetCitiesByCountry" doc:name="Web Service Consumer"/>       
+    </flow>
+    <flow name="/connectors/webserviceconsumerUsingDW">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/connectors/webserviceconsumerUsingDW" doc:name="HTTP"/>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <dw:transform-message metadata:id="fec019a9-2843-4d15-ad62-1dbd2d71ebd7" doc:name="Transform Message">
+            <dw:set-payload resource="classpath:dataweaveBeforeWSConsumer.dwl"></dw:set-payload>
+        </dw:transform-message>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <ws:consumer config-ref="Web_Service_Consumer" operation="GetCitiesByCountry" doc:name="Web Service Consumer"/>
+    </flow>
+    <flow name="/readFileDataAsAnAttachment">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/readFileDataAsAnAttachment" doc:name="HTTP"/>         
+        <set-payload value="#[message.inboundAttachments.myFile]" doc:name="Set Payload"/>
+        <set-payload value="#[payload.dataSource.content]" doc:name="Set Payload"/>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>       
+    </flow>
+    <flow name="/connectors/database/select">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/connectors/database/select" doc:name="HTTP"/>
+        <db:select config-ref="Generic_Database_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[select * from employee;]]></db:parameterized-query>
+        </db:select>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload doc:sample="sample_data\list_map.dwl"/>
+            <dw:set-payload resource="classpath:removeDuplicateRecords.dwl"/>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="/connectors/database/insertUpdateDelete">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/connectors/database/insertUpdateDelete" doc:name="HTTP"/>
+        <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+        	<db:insert config-ref="Generic_Database_Configuration" doc:name="Database">
+	            <db:parameterized-query><![CDATA[insert into employee (emp_Id, name) values (3, 'three'), (4, 'four');]]></db:parameterized-query>
+	        </db:insert>
+        	<logger message="After Inserting::::::::#[payload]" level="INFO" doc:name="Logger"/>
+	        <db:update config-ref="Generic_Database_Configuration" doc:name="Database">
+	            <db:parameterized-query><![CDATA[UPDATE employee SET name = 'Foooour' WHERE emp_Id=4;]]></db:parameterized-query>
+	        </db:update>
+	        <logger message="After Updating :::::#[payload]" level="INFO" doc:name="Logger"/>
+	        <db:delete config-ref="Generic_Database_Configuration" doc:name="Database">
+                <db:parameterized-query><![CDATA[delete from employee where emp_Id=4;]]></db:parameterized-query>
+	        </db:delete>
+	        <logger message="After Deleting #[payload]" level="INFO" doc:name="Logger"/>
+        </transactional>        
+    </flow>  
+    <flow name="dummyFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration" path="/dummyFLow" doc:name="HTTP"/>
+        <set-payload value="Hello, welcome to MUnit Testing" doc:name="Set Payload"/>
+        <logger level="INFO" doc:name="Logger"/>
+        <set-payload value="#[Integer.parseInt(10)]" doc:name="Set Payload"/>
+        <logger level="INFO" doc:name="Logger"/>    
+    </flow>     
+</mule>

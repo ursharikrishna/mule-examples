@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    
+    <flow name="errorHandling/mappingExceptionStrategy">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="errorHandling/mappingExceptionStrategy" doc:name="HTTP"/>
+        <expression-component doc:name="Expression"><![CDATA[import java.lang.Exception;
+Exception e = new Exception("Invalid operation here");
+throw e;]]></expression-component>
+    </flow>
+    <flow name="errorHandling/customExceptionStrategy">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="errorHandling/customExceptionStrategy" doc:name="HTTP">
+            <http:error-response-builder statusCode="500" reasonPhrase="Interesting error"/>
+        </http:listener>
+        <expression-component doc:name="Expression"><![CDATA[import java.lang.Exception;
+Exception e = new Exception("Invalid operation here");
+throw e;]]></expression-component>
+        <!-- <custom-exception-strategy class="examples.MyCustomErrorHandler" doc:name="Custom Exception Strategy"/> -->
+</flow>
+</mule>

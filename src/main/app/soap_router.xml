@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:apikit-soap="http://www.mulesoft.org/schema/mule/apikit-soap" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/apikit-soap http://www.mulesoft.org/schema/mule/apikit-soap/current/mule-apikit-soap.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <apikit-soap:config name="APIkit_SOAP__Configuration" portName="GlobalWeatherSoap" serviceName="GlobalWeather" wsdlUrl="http://www.webservicex.com/globalweather.asmx?WSDL" doc:name="APIkit SOAP: Configuration"/>
+    <!-- <apikit-soap:config name="APIkit_SOAP__Configuration" portName="GlobalWeatherSoap" serviceName="GlobalWeather" wsdlUrl="http://www.webservicex.com/globalweather.asmx?WSDL" doc:name="APIkit SOAP: Configuration"/> -->
+    <flow name="soap_routerFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/" doc:name="HTTP"/>
+        <apikit-soap:router config-ref="APIkit_SOAP__Configuration" doc:name="SOAP Router"/>
+       <!--  <apikit-soap:router config-ref="APIkit_SOAP__Configuration" doc:name="SOAP Router"/> -->
+    </flow>
+</mule>

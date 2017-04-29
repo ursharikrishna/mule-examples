@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+<global-property name="myEnv" value="myDev" doc:name="Global Property"/>
+<http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8855" doc:name="HTTP Listener Configuration"/>
+	<flow name="requestreplyscopeFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/requestreplyscope" doc:name="HTTP"/>
+        <logger level="INFO" doc:name="Logger"/>
+        <set-variable variableName="list" value="#[new java.util.ArrayList()]" doc:name="Instantiate List" />
+        <expression-component doc:name="Expression"><![CDATA[flowVars.list.add(10);
+flowVars.list.add(20);
+flowVars.list.add(30);
+payload=flowVars.list;
+]]></expression-component>
+        <set-payload value="#[flowVars.list]"  doc:name="Set Payload"/>        
+	        <request-reply doc:name="Request-Reply">
+	        	<!-- <processor-chain doc:name="processor chain"> -->	        	        		
+		          <vm:outbound-endpoint exchange-pattern="one-way" path="req" doc:name="VM">
+		          		<collection-splitter doc:name="Collection Splitter"/>  		          	
+	               		<set-property propertyName="MULE_CORRELATION_GROUP_SIZE" value="#[flowVars.list]" doc:name="Property"/> 	              	
+	           	  </vm:outbound-endpoint> 
+	           <!-- </processor-chain>  -->                              
+		         <vm:inbound-endpoint exchange-pattern="one-way" path="rep" doc:name="VM">
+		             <collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator" timeout="1000000"/>
+		         </vm:inbound-endpoint>                
+	        </request-reply>
+        <object-to-string-transformer doc:name="Object to String"/>	        
+        		<set-payload value="{&quot;result&quot;:#[payload]}" doc:name="Set Payload" mimeType="application/json"/>
+    </flow>
+    <flow name="FL_TruncateOrder" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="req" doc:name="VM"/>
+        <message-properties-transformer doc:name="MP_Read_Correlations" scope="invocation">
+            <add-message-property key="CorrelationGroupSize" value="#[message.outboundProperties.get('MULE_CORRELATION_GROUP_SIZE')]"/>
+            <add-message-property key="CorrelationId" value="#[message.outboundProperties.get('MULE_CORRELATION_ID')]"/>
+            <add-message-property key="CorrelationSeq" value="#[message.outboundProperties.get('MULE_CORRELATION_GROUP_SIZE')]"/>
+        </message-properties-transformer> 
+        <choice doc:name="Choice">
+        	<when expression="#[payload==10]">        		
+        		<set-payload value="Ten" doc:name="Set Payload"/>
+        	</when>
+        	<when expression="#[payload==20]">
+        		<set-payload value="Twenty" doc:name="Set Payload"/>
+        	</when>
+        	<otherwise>
+        		<set-payload value="AboveTwenty" doc:name="Set Payload"/>
+        	</otherwise>
+        </choice>       
+        
+        <message-properties-transformer doc:name="MP_Set_Correlations" >
+            <add-message-property key="MULE_CORRELATION_GROUP_SIZE" value="#[flowVars.CorrelationGroupSize]"/>
+            <add-message-property key="MULE_CORRELATION_ID" value="#[flowVars.CorrelationId]"/>
+            <add-message-property key="MULE_CORRELATION_SEQUENCE" value="#[flowVars.CorrelationSeq]"/>
+        </message-properties-transformer> 
+        <vm:outbound-endpoint exchange-pattern="one-way" path="rep" doc:name="VM"/>
+    </flow>
+    
+    <flow name="/scopes/forEach">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/scopes/forEach" doc:name="HTTP"/>
+        <expression-component doc:name="Expression"><![CDATA[import java.util.List;
+import java.util.ArrayList;
+
+List list = new ArrayList();
+list.add(1);
+list.add(2);
+list.add(3);
+list.add(4);
+list.add(5);
+list.add(6);
+list.add(7);
+list.add(8);
+list.add(9);
+list.add(10);
+payload = list;
+]]></expression-component>
+        <foreach collection="#[payload]" batchSize="2" doc:name="For Each">
+            <logger message="First :::::::::::: #[payload[0].originalPayload]                  Second ::::::::::::#[payload[1].originalPayload]                     Loop Iteration count ::::: #[counter]" level="INFO" doc:name="Logger"/>
+        </foreach>
+    </flow>
+    
+    
+    
+    
+    
+    <flow name="AllMethodsflow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/testFlowVarsBehaviour" doc:name="HTTP"/>        
+        <set-variable variableName="flowVariable" value="123" doc:name="Variable" /> 
+        <flow-ref name="privateFlow" doc:name="Flow Reference"/> 
+        <logger message="Ok, exception is already handled in private flow/sub-flow" doc:name="Logger"/>      
+    </flow>
+    <!-- <flow name="flow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/testFlowVarsBehaviour" doc:name="HTTP" allowedMethods="POST"/>        
+        <set-variable variableName="flowVariable" value="123" doc:name="Variable" /> 
+        <flow-ref name="privateFlow" doc:name="Flow Reference"/>       
+    </flow>     -->
+    <sub-flow name="subFlow">
+    	<logger level="INFO" doc:name="Logger" message="#[flowVars.flowVariable]"/>    	
+    </sub-flow>
+    <flow name="privateFlow">
+        <logger level="INFO" doc:name="Logger" message="#[flowVars.flowVariable]"/>
+        <flow-ref name="subFlow" doc:name="Flow Reference"/>
+        <!-- <message-filter throwOnUnaccepted="true" doc:name="MF_FilterStatusKey">
+            <payload-type-filter expectedType="java.lang.Integer"/>
+        </message-filter> -->
+        <expression-component doc:name="Expression"><![CDATA[import java.lang.Exception;
+Exception e = new Exception("Some exception occured in the flow");
+throw e;]]></expression-component>  
+        <catch-exception-strategy doc:name="exception">
+            <logger message="Exception is handled in Catch block" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>              
+    </flow>
+    <flow name="/scopes/messageEnricher">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/scopes/messageEnricher" doc:name="HTTP"/>
+        <set-payload value="{&quot;one&quot;:&quot;1&quot;,&quot;two&quot;:&quot;2&quot;,&quot;three&quot;:&quot;3&quot;,&quot;four&quot;:&quot;4&quot;}" mimeType="application/json" doc:name="Set Payload"/>
+        <enricher doc:name="Message Enricher" target="#[flowVars.extractedVal]">
+            <set-payload value="three" doc:name="Set Payload"/>
+        </enricher>
+        <logger message="#[payload]            and #[flowVars.extractedVal]" level="INFO" doc:name="Logger"/>
+        <set-payload value="#[json:three=flowVars.extractedVal]" doc:name="Set Payload"/>
+    </flow>        
+</mule>

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+   
+    <flow name="scattergatherFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/sgflowControl" doc:name="HTTP"/>
+        <logger level="INFO" doc:name="Logger"/>
+        <set-payload value="10" doc:name="Set Payload"/>
+        <scatter-gather doc:name="Scatter-Gather">
+            <set-payload value="#[payload+1]" doc:name="Set Payload"/>
+            <set-payload value="#[payload+2]" doc:name="Set Payload"/>
+            <set-payload value="{&quot;message&quot;:&quot;welcome to SG FC&quot;}" doc:name="Set Payload" mimeType="application/json"/>
+            <null-component/>
+        </scatter-gather>
+       <set-payload value="After scatter gather ::::::::::::: #[payload]" doc:name="Set Payload"/>
+    </flow>
+    
+    <flow name="/flowcontrol/splitterAggregator">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/flowcontrol/splitterAggregator" doc:name="HTTP"/>
+        <expression-component doc:name="EX_PrepareList"><![CDATA[import java.util.*;
+List list = new ArrayList();
+list.add(1);
+list.add(2);
+list.add(3);
+list.add(4);
+list.add(5);
+list.add(6);
+list.add(7);
+list.add(8);
+list.add(9);
+payload=list;]]></expression-component>
+        <collection-splitter doc:name="Collection Splitter"/>
+        <message-properties-transformer doc:name="MP_Read_Correlations" scope="invocation">
+	            <add-message-property key="CorrelationGroupSize" value="#[message.outboundProperties.get('MULE_CORRELATION_GROUP_SIZE')]"/>
+	            <add-message-property key="CorrelationId" value="#[message.outboundProperties.get('MULE_CORRELATION_ID')]"/>
+	            <add-message-property key="CorrelationSeq" value="#[message.outboundProperties.get('MULE_CORRELATION_GROUP_SIZE')]"/>
+        </message-properties-transformer>        
+        <set-payload value="#[payload+100]" doc:name="Set Payload"/>        
+        <message-properties-transformer doc:name="MP_Set_Correlations" >
+            <add-message-property key="MULE_CORRELATION_GROUP_SIZE" value="#[flowVars.CorrelationGroupSize]"/>
+            <add-message-property key="MULE_CORRELATION_ID" value="#[flowVars.CorrelationId]"/>
+            <add-message-property key="MULE_CORRELATION_SEQUENCE" value="#[flowVars.CorrelationSeq]"/>
+        </message-properties-transformer>
+        <collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator"/>               
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-payload value="{&quot;result&quot;:#[payload]}" mimeType="application/json" doc:name="Set Payload"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[message.payloadAs(DataType.BYTE_ARRAY_DATA_TYPE)]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="flowcontrol/messagechunksplitter">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/flowcontrol/messagechunksplitter" doc:name="HTTP"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <message-chunk-splitter messageSize="1024" doc:name="Message Chunk Splitter"/>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <message-chunk-aggregator failOnTimeout="true" doc:name="Message Chunk Aggregator"/>
+    </flow> 
+    <flow name="/flowcontrol/CollectionSplitterAggregatorInRequestReply">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/flowcontrol/CollectionSplitterAggregatorInRequestReply" doc:name="HTTP"/>
+        <expression-component doc:name="EX_PrepareList"><![CDATA[import java.util.*;
+List list = new ArrayList();
+list.add(1);
+list.add(2);
+list.add(3);
+list.add(4);
+list.add(5);
+list.add(6);
+list.add(7);
+list.add(8);
+list.add(9);
+payload=list;]]></expression-component>        
+        <request-reply doc:name="Request-Reply">
+            <vm:outbound-endpoint exchange-pattern="one-way" path="myrequest" doc:name="VM">
+            	<collection-splitter doc:name="Collection Splitter"/>
+            </vm:outbound-endpoint>
+            <vm:inbound-endpoint exchange-pattern="one-way" path="myresponse" doc:name="VM">            	
+            	<collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator"/> 
+            </vm:inbound-endpoint>
+        </request-reply>
+        
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-payload value="{&quot;finalResult&quot;:#[payload]}" mimeType="application/json" doc:name="Set Payload"/>    
+    </flow>
+    <flow name="TestCorrelationIds" >
+        <vm:inbound-endpoint exchange-pattern="one-way" path="myrequest" doc:name="VM"/>
+        <!-- <message-properties-transformer doc:name="MP_Read_Correlations" scope="invocation">
+	            <add-message-property key="CorrelationGroupSize" value="#[message.outboundProperties.get('MULE_CORRELATION_GROUP_SIZE')]"/>
+	            <add-message-property key="CorrelationId" value="#[message.outboundProperties.get('MULE_CORRELATION_ID')]"/>
+	            <add-message-property key="CorrelationSeq" value="#[message.outboundProperties.get('MULE_CORRELATION_GROUP_SIZE')]"/>
+        </message-properties-transformer> --> 
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <set-payload value="#[payload+100]" doc:name="Set Payload"/>
+        <logger level="INFO" doc:name="Logger"/>
+        <!-- <message-properties-transformer doc:name="MP_Set_Correlations" >
+            <add-message-property key="MULE_CORRELATION_GROUP_SIZE" value="#[flowVars.CorrelationGroupSize]"/>
+            <add-message-property key="MULE_CORRELATION_ID" value="#[flowVars.CorrelationId]"/>
+            <add-message-property key="MULE_CORRELATION_SEQUENCE" value="#[flowVars.CorrelationSeq]"/>
+        </message-properties-transformer> -->
+        <vm:outbound-endpoint exchange-pattern="one-way" path="myresponse" doc:name="VM"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+        	<logger message="Exception has been handled here" level="INFO" doc:name="Logger"/> 
+            <vm:outbound-endpoint exchange-pattern="one-way" path="myresponse" doc:name="VM"/>
+        </catch-exception-strategy>
+    </flow>
+    
+</mule>

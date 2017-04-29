@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+    <flow name="/transformers/dataweave/test">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/transformers/dataweave/test" doc:name="HTTP"/>
+        <set-payload value="{&quot;key&quot;:&quot;value&quot;}" mimeType="application/json" doc:name="Set Payload"/>
+             <dw:transform-message doc:name="Transform Message" metadata:id="487db0cf-48f0-4086-be88-ec9a12d3368e">
+            <dw:input-payload doc:sample="json.json"/>
+            <dw:set-payload resource="classpath:test.dwl"></dw:set-payload>
+        </dw:transform-message>
+        <set-payload doc:name="Set Payload" value="123"/>
+    </flow>
+    <flow name="/trasnformers/dataweave/lookup">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/trasnformers/dataweave/lookup" doc:name="HTTP"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:lookup.dwl"></dw:set-payload>
+        </dw:transform-message>
+        <logger level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="lookupflow">
+	    <set-payload doc:name="Set Payload" value="#[payload.b + ' world!' ]"/>
+	</flow>
+    <flow name="/transformers/dataweave/reduce">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/transformers/dataweave/reduce" doc:name="HTTP"/>
+        <set-variable variableName="list" value="#[new java.util.ArrayList()]" doc:name="Variable"/>
+        <expression-component doc:name="Expression"><![CDATA[flowVars.list.add(10);
+flowVars.list.add(20);
+flowVars.list.add(30);
+payload=flowVars.list;
+]]></expression-component>
+        <dw:transform-message doc:name="Transform Message" metadata:id="487db0cf-48f0-4086-be88-ec9a12d3368e">
+            <dw:input-payload doc:sample="json.json"/>
+            <dw:set-payload resource="classpath:reduce.dwl"></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="/transformers/dataweave/sum">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/transformers/dataweave/sum" doc:name="HTTP"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"a": 1+5+10
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>        
+</mule>
